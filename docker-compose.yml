@@ -1,0 +1,34 @@
+version : '2.0'
+services:
+
+  appserver:
+    build:
+      context: .
+      dockerfile: app.dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - net-spring-db
+    volumes:
+      - .:/vol/development
+    depends_on:
+      - mysqlserver
+
+  mysqlserver:
+    build:
+      context: .
+      dockerfile: mysql.dockerfile
+    ports:
+      - "3306:3306"
+    networks:
+      - net-spring-db
+    environment:
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+      MYSQL_ROOT_PASSWORD: myrootpassword
+    container_name: mysqlserver
+
+networks:
+  net-spring-db:
+    driver: bridge
