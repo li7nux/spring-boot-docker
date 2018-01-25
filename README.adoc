@@ -1,0 +1,135 @@
+= spring boot with docker
+li7nux
+v0.5.6,2018-01-25
+:doctype: book
+:encoding: utf-8uop2BDCStartUp
+:lang: zh-CN
+:toc: left
+:toclevels: 4
+:numbered:
+
+* 当前 `master` 分支是使用 `docker-compose` 构建应用的。
+* `boot-docker` 分支是使用 `docker` 构建应用的。
+
+== 使用 Docker compose 构建、运行 Spring Boot 应用
+
+=== spring boot
+
+创建一个简单的基于 `spring boot web` 的应用。
+数据存储在 `mysql` 里，使用 `spring-data-jpa` 进行数据操作。
+
+=== docker 
+
+==== 构建 MySQL 镜像
+
+* 创建 `mysql.dockerfile`
+
+[source, shell]
+----
+FROM mysql/mysql-server
+
+ADD  mysql/ /docker-entrypoint-initdb.d/
+----
+
+* 准备数据
+
+[source, sql]
+----
+use testdb;
+
+CREATE TABLE player (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  name varchar(100) NOT NULL,
+  no varchar(100) NOT NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+insert into player (name,no) values('James','23');
+----
+
+==== 构建 APP 镜像
+
+* 创建 `app.dockerfile`
+
+[source, shell]
+----
+FROM java:8
+
+RUN  \
+  export DEBIAN_FRONTEND=noninteractive && \
+  sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list && \
+  apt-get update && \
+  apt-get -y upgrade && \
+  apt-get install -y vim wget curl maven
+
+VOLUME /vol/development
+
+RUN mkdir -p /vol/development
+WORKDIR /vol/development
+
+CMD ["mvn", "clean", "install", "spring-boot:run"]
+----
+
+==== 构建 docker-compose 配置
+
+* 创建 `docker-compose.yml`
+
+[source, shell]
+----
+version : '2.0'
+services:
+
+  appserver:
+    build:
+      context: .
+      dockerfile: app.dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - net-spring-db
+    volumes:
+      - .:/vol/development
+    depends_on:
+      - mysqlserver
+
+  mysqlserver:
+    build:
+      context: .
+      dockerfile: mysql.dockerfile
+    ports:
+      - "3306:3306"
+    networks:
+      - net-spring-db
+    environment:
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+      MYSQL_ROOT_PASSWORD: myrootpassword
+    container_name: mysqlserver
+
+networks:
+  net-spring-db:
+    driver: bridge
+----
+
+
+=== 运行
+
+* 启动项目
+
+[source, shell]
+----
+git clone https://github.com/li7nux/spring-boot-docker.git
+
+cd spring-boot-docker
+
+docker-compose up -d
+----
+
+* 访问
+
+[source, shell]
+----
+[root@vultr ~]# curl localhost:8080/players/
+[{"id":1,"name":"James","no":"23"}]
+----
